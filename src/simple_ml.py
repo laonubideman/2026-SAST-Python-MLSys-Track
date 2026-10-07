@@ -20,7 +20,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x + y
     ### END YOUR CODE
 
 
@@ -48,7 +48,54 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+    with gzip.open(image_filename, "rb") as image_file:
+        image_header = image_file.read(16)
+        if len(image_header) != 16:
+            raise ValueError("invalid MNIST image file: truncated header")
+        image_magic, image_count, rows, columns = struct.unpack(
+            ">IIII", image_header
+        )
+        if image_magic != 2051:
+            raise ValueError(
+                f"invalid MNIST image magic number: {image_magic}"
+            )
+        image_bytes = image_file.read()
+
+    expected_image_bytes = image_count * rows * columns
+    if len(image_bytes) != expected_image_bytes:
+        raise ValueError(
+            "invalid MNIST image file: "
+            f"expected {expected_image_bytes} bytes, got {len(image_bytes)}"
+        )
+
+    with gzip.open(label_filename, "rb") as label_file:
+        label_header = label_file.read(8)
+        if len(label_header) != 8:
+            raise ValueError("invalid MNIST label file: truncated header")
+        label_magic, label_count = struct.unpack(">II", label_header)
+        if label_magic != 2049:
+            raise ValueError(
+                f"invalid MNIST label magic number: {label_magic}"
+            )
+        label_bytes = label_file.read()
+
+    if len(label_bytes) != label_count:
+        raise ValueError(
+            "invalid MNIST label file: "
+            f"expected {label_count} bytes, got {len(label_bytes)}"
+        )
+    if image_count != label_count:
+        raise ValueError(
+            "MNIST image/label count mismatch: "
+            f"{image_count} images and {label_count} labels"
+        )
+
+    X = np.frombuffer(image_bytes, dtype=np.uint8).reshape(
+        image_count, rows * columns
+    )
+    X = X.astype(np.float32) / np.float32(255.0)
+    y = np.frombuffer(label_bytes, dtype=np.uint8).copy()
+    return X, y
     ### END YOUR CODE
 
 
@@ -68,7 +115,12 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    # Subtracting the row maximum leaves softmax unchanged and prevents
+    # exp() from overflowing for large logits.
+    shifted = Z - np.max(Z, axis=1, keepdims=True)
+    log_normalizer = np.log(np.sum(np.exp(shifted), axis=1))
+    correct_logits = shifted[np.arange(y.shape[0]), y]
+    return np.mean(log_normalizer - correct_logits)
     ### END YOUR CODE
 
 
@@ -91,7 +143,20 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass   
+    if batch <= 0:
+        raise ValueError("batch must be positive")
+
+    for start in range(0, X.shape[0], batch):
+        X_batch = X[start:start + batch]
+        y_batch = y[start:start + batch]
+
+        logits = X_batch @ theta
+        logits -= np.max(logits, axis=1, keepdims=True)
+        probabilities = np.exp(logits)
+        probabilities /= np.sum(probabilities, axis=1, keepdims=True)
+        probabilities[np.arange(y_batch.shape[0]), y_batch] -= 1.0
+
+        theta -= lr * (X_batch.T @ probabilities) / y_batch.shape[0]
     ### END YOUR CODE
 
 
@@ -118,7 +183,30 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    if batch <= 0:
+        raise ValueError("batch must be positive")
+
+    for start in range(0, X.shape[0], batch):
+        X_batch = X[start:start + batch]
+        y_batch = y[start:start + batch]
+        batch_size = y_batch.shape[0]
+
+        hidden_pre_activation = X_batch @ W1
+        hidden = np.maximum(hidden_pre_activation, 0)
+        logits = hidden @ W2
+        logits -= np.max(logits, axis=1, keepdims=True)
+        logits_gradient = np.exp(logits)
+        logits_gradient /= np.sum(logits_gradient, axis=1, keepdims=True)
+        logits_gradient[np.arange(batch_size), y_batch] -= 1.0
+
+        # Compute both gradients before mutating either weight matrix.
+        W2_gradient = hidden.T @ logits_gradient / batch_size
+        hidden_gradient = logits_gradient @ W2.T
+        hidden_gradient *= hidden_pre_activation > 0
+        W1_gradient = X_batch.T @ hidden_gradient / batch_size
+
+        W1 -= lr * W1_gradient
+        W2 -= lr * W2_gradient
     ### END YOUR CODE
 
 
