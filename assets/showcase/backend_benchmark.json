@@ -1,0 +1,31 @@
+{
+  "config": {
+    "samples": 60000,
+    "epochs": 10,
+    "repeats": 3,
+    "batch": 100,
+    "learning_rate": 0.2
+  },
+  "results": [
+    {
+      "backend": "NumPy",
+      "time_seconds": 0.29807374998927116,
+      "speedup_vs_numpy": 1.0,
+      "train_loss": 0.2788658142089844,
+      "train_error": 0.07846666666666667,
+      "test_loss": 0.2844165563583374,
+      "test_error": 0.0797,
+      "max_parameter_difference": 0.0
+    },
+    {
+      "backend": "C++",
+      "time_seconds": 3.275498125003651,
+      "speedup_vs_numpy": 0.09100104430343367,
+      "train_loss": 0.2788658142089844,
+      "train_error": 0.07846666666666667,
+      "test_loss": 0.2844165563583374,
+      "test_error": 0.0797,
+      "max_parameter_difference": 7.748603820800781e-07
+    }
+  ]
+}
