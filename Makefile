@@ -10,7 +10,7 @@ ifeq ($(shell uname -s),Darwin)
 PYTHON_LINK_FLAGS := -undefined dynamic_lookup
 endif
 
-.PHONY: default cuda clean
+.PHONY: default cuda test showcase clean
 
 default:
 	$(CXX) -O3 -Wall -shared -std=c++11 -fPIC \
@@ -22,6 +22,12 @@ cuda:
 	$(NVCC) -O3 -std=c++14 --shared -Xcompiler -fPIC \
 		-I"$(PYTHON_INCLUDE)" -I"$(PYBIND11_INCLUDE)" \
 		src/simple_ml_cuda.cu -o "src/simple_ml_cuda$(EXT_SUFFIX)"
+
+test: default
+	$(PYTHON) -m pytest -q
+
+showcase:
+	MPLBACKEND=Agg MPLCONFIGDIR=/tmp/mnist-matplotlib $(PYTHON) showcase.py
 
 clean:
 	rm -f src/simple_ml_ext*.so src/simple_ml_ext*.dylib src/simple_ml_ext*.pyd

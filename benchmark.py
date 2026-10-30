@@ -1,6 +1,7 @@
 """Compare the NumPy, C++, and CUDA softmax-regression backends."""
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -61,6 +62,11 @@ def main():
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--batch", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.2)
+    parser.add_argument(
+        "--json",
+        type=Path,
+        help="optionally write machine-readable benchmark results",
+    )
     args = parser.parse_args()
 
     if args.samples <= 0 or args.epochs <= 0 or args.repeats <= 0:
@@ -130,6 +136,45 @@ def main():
             f"{tr_loss:.5f} | {tr_err:.5f} | {te_loss:.5f} | "
             f"{te_err:.5f} | {difference:.3e} |"
         )
+
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "config": {
+                "samples": sample_count,
+                "epochs": args.epochs,
+                "repeats": args.repeats,
+                "batch": args.batch,
+                "learning_rate": args.lr,
+            },
+            "results": [
+                {
+                    "backend": name,
+                    "time_seconds": duration,
+                    "speedup_vs_numpy": speedup,
+                    "train_loss": tr_loss,
+                    "train_error": tr_err,
+                    "test_loss": te_loss,
+                    "test_error": te_err,
+                    "max_parameter_difference": difference,
+                }
+                for (
+                    name,
+                    duration,
+                    speedup,
+                    tr_loss,
+                    tr_err,
+                    te_loss,
+                    te_err,
+                    difference,
+                ) in results
+            ],
+        }
+        args.json.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"\nWrote {args.json}")
 
     if len(results) == 1:
         print("\nC++ is not built and no CUDA device is available; only NumPy ran.")
